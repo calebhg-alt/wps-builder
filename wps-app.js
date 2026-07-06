@@ -39,7 +39,7 @@
       createdAt: new Date().toISOString(),
       linkedWpsId: "",
       testId: { name: "", idNumber: "", stampNo: "", company: "", division: "", testDate: "", recordNo: "", stdTestNo: "" },
-      variables: { actualThicknessIn: "", rangeQualifiedMinIn: "", rangeQualifiedMaxIn: "", weldJointType: "", progression: "", backing: "", electrodeCount: "Single" },
+      variables: { actualThicknessIn: "", rangeQualifiedMinIn: "", rangeQualifiedMaxIn: "", rangeQualifiedMaxUnlimited: false, weldJointType: "", progression: "", backing: "", electrodeCount: "Single" },
       testResults: [{ type: "", acceptanceCriteria: "", result: "", remarks: "" }],
       certification: { testConductedBy: "", laboratory: "", testNumber: "", fileNumber: "", manufacturerContractor: "", authorizedBy: "", certDate: "" },
     };
@@ -770,7 +770,7 @@
         <legend>Welder Identification</legend>
         <div class="field-row">
           ${field({ id: "name", label: "Welder Name", required: true, value: t.name })}
-          ${field({ id: "idNumber", label: "ID Number", required: true, value: t.idNumber })}
+          ${field({ id: "idNumber", label: "ID Number", required: false, value: t.idNumber, hint: "Practice exercise \u2014 make up a number, e.g., \u201cAVC-2026-014\u201d" })}
         </div>
         <div class="field-row">
           ${field({ id: "stampNo", label: "Stamp No.", required: false, value: t.stampNo })}
@@ -784,7 +784,7 @@
         <legend>Test Identification</legend>
         <div class="field-row">
           ${field({ id: "testDate", label: "Test Date", required: true, type: "date", value: t.testDate })}
-          ${field({ id: "recordNo", label: "Record No.", required: true, value: t.recordNo })}
+          ${field({ id: "recordNo", label: "Record No.", required: false, value: t.recordNo, hint: "Practice exercise \u2014 make up a number, e.g., \u201cWQTR-2026-014\u201d" })}
         </div>
         <div class="field-row">
           ${field({ id: "stdTestNo", label: "Std. Test No.", required: false, value: t.stdTestNo })}
@@ -815,8 +815,21 @@
       <fieldset>
         <legend>Range Qualified</legend>
         <div class="field-row">
-          ${field({ id: "rangeQualifiedMinIn", label: "Thickness Range Qualified \u2014 Min (in)", required: true, type: "number", value: v.rangeQualifiedMinIn })}
-          ${field({ id: "rangeQualifiedMaxIn", label: "Thickness Range Qualified \u2014 Max (in)", required: true, type: "number", value: v.rangeQualifiedMaxIn })}
+          ${field({ id: "rangeQualifiedMinIn", label: "Thickness Range Qualified \u2014 Min (in)", required: true, type: "number", value: v.rangeQualifiedMinIn, hint: "Enter as a decimal \u2014 example: 1/16 inch = 0.0625" })}
+          <div class="field">
+            <label for="rangeQualifiedMaxIn">Thickness Range Qualified \u2014 Max (in)${v.rangeQualifiedMaxUnlimited ? "" : '<span class="required-mark" aria-hidden="true">*</span>'}</label>
+            <input type="text" id="rangeQualifiedMaxIn" name="rangeQualifiedMaxIn"
+              value="${v.rangeQualifiedMaxUnlimited ? "Unlimited" : escapeHtml(v.rangeQualifiedMaxIn)}"
+              ${v.rangeQualifiedMaxUnlimited ? "readonly" : ""}
+              aria-describedby="rangeQualifiedMaxIn-msg">
+            <span class="hint">
+              <label style="display:inline-flex;align-items:center;gap:5px;font-weight:normal;">
+                <input type="checkbox" id="rangeQualifiedMaxUnlimited" ${v.rangeQualifiedMaxUnlimited ? "checked" : ""} style="width:auto;padding:0;">
+                No maximum \u2014 qualified for unlimited thickness above the minimum
+              </label>
+            </span>
+            <div id="rangeQualifiedMaxIn-msg"></div>
+          </div>
         </div>
         <div class="field-row">
           ${field({ id: "electrodeCount", label: "Single or Multiple Electrodes", required: false, tag: "select", value: v.electrodeCount, options: [{ value: "Single", label: "Single" }, { value: "Multiple", label: "Multiple" }] })}
@@ -830,7 +843,7 @@
     const rows = wqtr.testResults.map((r, i) => `
       <div class="field-row" data-result-row="${i}" style="border:1px solid var(--border);padding:12px;border-radius:4px;margin-bottom:10px;">
         ${field({ id: `resultType_${i}`, label: "Type of Test", required: false, tag: "select", value: r.type, options: WQTR_TEST_TYPES.map(x => ({ value: x, label: x })) })}
-        ${field({ id: `resultCriteria_${i}`, label: "Acceptance Criteria", required: false, value: r.acceptanceCriteria })}
+        ${field({ id: `resultCriteria_${i}`, label: "Acceptance Criteria", required: false, value: r.acceptanceCriteria, hint: "Cite the D1.1 clause that governs this test, e.g., &ldquo;Clause 6.9, Table 6.1&rdquo; for visual inspection" })}
         ${field({ id: `resultValue_${i}`, label: "Result", required: false, value: r.result })}
         ${field({ id: `resultRemarks_${i}`, label: "Remarks", required: false, value: r.remarks })}
         ${wqtr.testResults.length > 1 ? `<button type="button" class="btn btn-ghost" style="color:#8f1515;border-color:#8f1515;" data-remove-result="${i}">Remove Row</button>` : ""}
@@ -838,7 +851,7 @@
     `).join("");
     return `
       <h1 class="step-title">Test Results</h1>
-      <p class="step-desc">Add one row per test performed (visual, bend, break, macroetch, RT, etc.).</p>
+      <p class="step-desc">Add one row per test performed (visual, bend, break, macroetch, RT, etc.). For Acceptance Criteria, name the D1.1 clause that governs that test rather than describing the requirement in your own words.</p>
       <fieldset>
         <legend>Test Results</legend>
         <div id="resultsRows">${rows}</div>
@@ -850,6 +863,22 @@
   function renderWqtrCertificationStep() {
     const wqtr = getActiveWqtr();
     const c = wqtr.certification;
+    const linkedWps = getWpsById(wqtr.linkedWpsId);
+
+    // Auto-populate Test Number and File Number from earlier steps, if not already set.
+    let autoFilled = false;
+    if (!c.testNumber && (wqtr.testId.recordNo || wqtr.testId.stdTestNo)) {
+      c.testNumber = wqtr.testId.recordNo || wqtr.testId.stdTestNo;
+      autoFilled = true;
+    }
+    if (!c.fileNumber && (linkedWps || wqtr.testId.recordNo)) {
+      const wpsNum = linkedWps ? linkedWps.header.wpsNumber : "";
+      const recNum = wqtr.testId.recordNo || "";
+      const combined = [wpsNum, recNum].filter(Boolean).join("-");
+      if (combined) { c.fileNumber = combined; autoFilled = true; }
+    }
+    if (autoFilled) saveAppState();
+
     return `
       <h1 class="step-title">Certification</h1>
       <p class="step-desc">Signature and lab information from Form M-4.</p>
@@ -860,8 +889,8 @@
           ${field({ id: "laboratory", label: "Laboratory", required: false, value: c.laboratory })}
         </div>
         <div class="field-row">
-          ${field({ id: "testNumber", label: "Test Number", required: false, value: c.testNumber })}
-          ${field({ id: "fileNumber", label: "File Number", required: false, value: c.fileNumber })}
+          ${field({ id: "testNumber", label: "Test Number", required: false, value: c.testNumber, hint: "Auto-filled from your Record No. / Std. Test No. \u2014 edit if you'd like a different number" })}
+          ${field({ id: "fileNumber", label: "File Number", required: false, value: c.fileNumber, hint: "Auto-filled from WPS number + Record No. \u2014 edit if you'd like a different number" })}
         </div>
       </fieldset>
       <fieldset>
@@ -869,9 +898,14 @@
         <p style="font-size:13px;color:var(--muted);font-style:italic;">
           &ldquo;We, the undersigned, certify that the statements in this record are correct and that the test welds were prepared, welded, and tested in accordance with the requirements of Clause 4 of AWS D1.1/D1.1M (2015) Structural Welding Code&mdash;Steel.&rdquo;
         </p>
+        <div class="citation">
+          <strong>How to complete this for a class exercise:</strong><br>
+          &bull; <strong>Manufacturer or Contractor</strong> is the organization standing behind the test \u2014 for this course, that's typically <strong>Antelope Valley College</strong> (use your actual employer instead if this is real workplace testing).<br>
+          &bull; <strong>Authorized By</strong> is the person who oversaw or is certifying the test \u2014 for a class exercise, that's usually your instructor's name; in industry, it would be a Certified Welding Inspector (CWI) or other authorized representative.
+        </div>
         <div class="field-row">
-          ${field({ id: "manufacturerContractor", label: "Manufacturer or Contractor", required: true, value: c.manufacturerContractor })}
-          ${field({ id: "authorizedBy", label: "Authorized By", required: true, value: c.authorizedBy })}
+          ${field({ id: "manufacturerContractor", label: "Manufacturer or Contractor", required: true, value: c.manufacturerContractor, hint: "e.g., Antelope Valley College" })}
+          ${field({ id: "authorizedBy", label: "Authorized By", required: true, value: c.authorizedBy, hint: "e.g., your instructor's name" })}
         </div>
         <div class="field-row">
           ${field({ id: "certDate", label: "Date", required: true, type: "date", value: c.certDate })}
@@ -924,6 +958,13 @@
         on(f, "input", (e) => { wqtr.variables[f] = e.target.value; saveAppState(); updateWqtrPreview(); });
         on(f, "change", (e) => { wqtr.variables[f] = e.target.value; saveAppState(); updateWqtrPreview(); });
       });
+      on("rangeQualifiedMaxUnlimited", "change", (e) => {
+        wqtr.variables.rangeQualifiedMaxUnlimited = e.target.checked;
+        if (e.target.checked) { wqtr.variables.rangeQualifiedMaxIn = "Unlimited"; }
+        else { wqtr.variables.rangeQualifiedMaxIn = ""; }
+        saveAppState();
+        renderWqtrStep();
+      });
     }
     if (stepId === "results") {
       wqtr.testResults.forEach((r, i) => {
@@ -975,7 +1016,7 @@
     if (!box) return;
     const checks = [
       { label: "Source WPS selected", ok: !!wqtr.linkedWpsId },
-      { label: "Welder and test identification complete", ok: !!(wqtr.testId.name && wqtr.testId.idNumber && wqtr.testId.company && wqtr.testId.testDate && wqtr.testId.recordNo) },
+      { label: "Welder and test identification complete", ok: !!(wqtr.testId.name && wqtr.testId.company && wqtr.testId.testDate) },
       { label: "Base metal and range qualified entered", ok: !!(wqtr.variables.weldJointType && wqtr.variables.actualThicknessIn && wqtr.variables.rangeQualifiedMinIn && wqtr.variables.rangeQualifiedMaxIn) },
       { label: "At least one test result recorded", ok: wqtr.testResults.some(r => r.type && r.result) },
       { label: "Certification signatures entered", ok: !!(wqtr.certification.manufacturerContractor && wqtr.certification.authorizedBy && wqtr.certification.certDate) },
@@ -993,7 +1034,7 @@
 
     const row = (label, value, isCode) => `<tr><th scope="row">${label}</th><td class="${isCode ? 'code' : ''} ${value ? '' : 'empty'}">${value ? escapeHtml(value) : 'Not yet specified'}</td></tr>`;
 
-    const allComplete = !!(wqtr.linkedWpsId && t.name && t.idNumber && t.company && t.testDate && t.recordNo &&
+    const allComplete = !!(wqtr.linkedWpsId && t.name && t.company && t.testDate &&
       v.weldJointType && v.actualThicknessIn && v.rangeQualifiedMinIn && v.rangeQualifiedMaxIn &&
       wqtr.testResults.some(r => r.type && r.result) &&
       c.manufacturerContractor && c.authorizedBy && c.certDate);
@@ -1053,6 +1094,8 @@
       <table class="wps-table">
         ${row("Test Conducted By", c.testConductedBy)}
         ${row("Laboratory", c.laboratory)}
+        ${row("Test Number", c.testNumber, true)}
+        ${row("File Number", c.fileNumber, true)}
         ${row("Manufacturer/Contractor", c.manufacturerContractor)}
         ${row("Authorized By", c.authorizedBy)}
         ${row("Date", c.certDate)}
