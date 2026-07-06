@@ -97,6 +97,68 @@
     margin: 2px 0 0 0;
   }
   .header-actions { display: flex; gap: 10px; align-items: center; }
+
+  /* ---------------- Mode tabs ---------------- */
+  nav.mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  .mode-tab {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: #CADCFC;
+    cursor: pointer;
+  }
+  .mode-tab:hover { background: rgba(255,255,255,0.12); }
+  .mode-tab[aria-current="true"] {
+    background: #fff;
+    color: var(--navy);
+  }
+
+  /* ---------------- Documents list ---------------- */
+  .doc-list-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  table.doc-list {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  table.doc-list th, table.doc-list td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  table.doc-list th {
+    background: var(--panel);
+    color: var(--navy);
+    font-family: var(--serif);
+  }
+  table.doc-list td.doc-actions { white-space: nowrap; }
+  table.doc-list td.doc-actions button {
+    font-size: 12.5px;
+    padding: 6px 10px;
+    margin-right: 6px;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
   .btn {
     font-family: var(--sans);
     font-size: 14px;
@@ -450,35 +512,40 @@
 
 <header class="app-header">
   <div>
-    <p class="app-title">WPS Builder &mdash; FCAW-S</p>
+    <p class="app-title">WPS &amp; WQTR Builder</p>
     <p class="app-subtitle">WELD 265 &middot; Based on AWS D1.1/D1.1M:2015</p>
   </div>
+  <nav class="mode-tabs" aria-label="Builder mode">
+    <button type="button" class="mode-tab" data-mode="docs" aria-current="false">My Documents</button>
+    <button type="button" class="mode-tab" data-mode="wps" aria-current="false">WPS Builder</button>
+    <button type="button" class="mode-tab" data-mode="wqtr" aria-current="false">WQTR Builder</button>
+  </nav>
   <div class="header-actions">
     <button type="button" class="btn btn-ghost" id="shortcutsBtn" aria-haspopup="dialog">
       Keyboard Shortcuts
     </button>
-    <button type="button" class="btn btn-ghost" id="resetBtn">Start Over</button>
+    <button type="button" class="btn btn-ghost" id="resetBtn">Clear All Data</button>
   </div>
 </header>
 
 <div class="app-shell">
 
-  <nav class="stepper" aria-label="WPS builder steps">
-    <h2>Steps</h2>
+  <nav class="stepper" aria-label="Builder steps" id="stepperNav">
+    <h2 id="stepperHeading">Steps</h2>
     <ol id="stepperList"></ol>
   </nav>
 
   <main id="main-content" tabindex="-1">
     <div id="stepContent" aria-live="polite"></div>
 
-    <div class="step-footer">
+    <div class="step-footer" id="stepFooter">
       <button type="button" class="btn btn-secondary" id="prevBtn">&#8592; Back</button>
       <span id="stepPosition" class="sr-only" aria-live="polite"></span>
       <button type="button" class="btn btn-primary" id="nextBtn">Next &#8594;</button>
     </div>
   </main>
 
-  <aside class="preview-pane" aria-label="Live WPS preview">
+  <aside class="preview-pane" aria-label="Live document preview" id="previewPane">
     <h2>
       Live Preview
       <button type="button" class="btn btn-secondary" id="printBtn" style="font-size:12px;padding:6px 10px;">
@@ -492,7 +559,8 @@
 
 <footer class="app-footer">
   WELD 265 &middot; Antelope Valley College CTE Welding Department &middot; Instructor: Caleb Healey<br>
-  Educational tool citing AWS D1.1/D1.1M:2015. Always verify against the official code text and governing project WPS before real-world use.
+  Educational tool citing AWS D1.1/D1.1M:2015. Always verify against the official code text and governing project WPS before real-world use.<br>
+  <strong>For educational use only &mdash; not for commercial use.</strong> Documents generated here are student training exercises, not substitutes for a properly qualified and certified WPS/WQTR on an actual construction project.
 </footer>
 
 <div class="modal-overlay" id="shortcutsModal" hidden role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle">
